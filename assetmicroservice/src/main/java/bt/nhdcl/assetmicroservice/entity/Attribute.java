@@ -1,30 +1,19 @@
 package bt.nhdcl.assetmicroservice.entity;
 
 public class Attribute {
-    private String field;
-    private Object value;
+    private String name;
+    private String value;
 
-    // Constructor
-    public Attribute(String field, Object value) {
-        this.field = field;
+    public Attribute() {}
+
+    public Attribute(String name, String value) {
+        this.name = name;
         this.value = value;
     }
 
-    // Getters and Setters
-    public String getField() {
-        return field;
-    }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
 
-    public void setField(String field) {
-        this.field = field;
-    }
-
-    public Object getValue() {
-        return value;
-    }
-
-    public void setValue(Object value) {
-        this.value = value;
-    }
+    public String getValue() { return value; }
+    public void setValue(String value) { this.value = value; }
 }
-

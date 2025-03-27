@@ -3,7 +3,9 @@ package bt.nhdcl.assetmicroservice.controller;
 import bt.nhdcl.assetmicroservice.entity.Asset;
 import bt.nhdcl.assetmicroservice.service.AssetService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -39,4 +41,15 @@ public class AssetController {
     public void deleteAsset(@PathVariable String assetCode) {
         assetService.deleteAsset(assetCode);
     }
+
+    @PostMapping("/{assetID}/upload")
+    public ResponseEntity<Asset> uploadFile(
+            @PathVariable int assetID,
+            @RequestParam("file") MultipartFile file) {
+        // Handle the file upload
+        Asset updatedAsset = assetService.uploadFileToAsset(assetID, file);
+
+        return ResponseEntity.ok(updatedAsset);
+    }
+
 }

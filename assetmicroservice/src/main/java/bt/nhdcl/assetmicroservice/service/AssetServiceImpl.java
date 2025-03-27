@@ -9,6 +9,8 @@ import org.springframework.data.domain.Sort;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.web.multipart.MultipartFile;
+
 
 @Service
 public class AssetServiceImpl implements AssetService {
@@ -18,6 +20,9 @@ public class AssetServiceImpl implements AssetService {
 
     @Autowired
     private MongoTemplate mongoTemplate;
+
+    @Autowired
+    private CloudinaryService cloudinaryService;
 
     @Override
     public Asset saveAsset(Asset asset) {
@@ -55,5 +60,18 @@ public class AssetServiceImpl implements AssetService {
         Query query = new Query().with(Sort.by(Sort.Order.desc("assetID"))).limit(1);
         Asset latestAsset = mongoTemplate.findOne(query, Asset.class);
         return latestAsset == null ? 1 : latestAsset.getAssetID() + 1;
+    }
+
+    public Asset uploadFileToAsset(int assetID, MultipartFile file) {
+        Optional<Asset> assetOptional = assetRepository.findByAssetID(assetID);
+        if (assetOptional.isEmpty()) {
+            throw new RuntimeException("Asset not found");
+        }
+    
+        Asset asset = assetOptional.get();
+        String fileUrl = cloudinaryService.uploadFile(file); // Upload file to Cloudinary
+        asset.addFileAttribute(fileUrl); // Add file URL as an attribute
+    
+        return assetRepository.save(asset); // Save updated asset
     }
 }

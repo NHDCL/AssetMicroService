@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Building Room Selector</title>
+</head>
+<body>
+
+    <form id="assetForm">
+        <div>
+            <label>Asset Category Name:</label>
+            <select id="assetCategoryName" name="assetCategoryName">
+                <option value="">Select Category</option>
+                <option value="Building">Building</option>
+            </select>
+        </div>
+
+        <div id="floorSelectionSection" style="display: none;">
+            <label>Select Floor:</label>
+            <select id="floorSelect">
+                <option value="">Select Floor</option>
+            </select>
+        </div>
+
+        <div id="roomSelectionSection" style="display: none;">
+            <label>Select Room:</label>
+            <select id="roomSelect">
+                <option value="">Select Room</option>
+            </select>
+        </div>
+
+        <button type="submit">Submit</button>
+    </form>
+
+    <script>
+        // Sample data for floors and rooms
+        const floorAndRooms = {
+            "First Floor": ["Room 101", "Room 102", "Room 103"],
+            "Second Floor": ["Room 201", "Room 202"]
+        };
+
+        document.getElementById('assetCategoryName').addEventListener('change', function () {
+            const floorSelect = document.getElementById('floorSelect');
+            const roomSelect = document.getElementById('roomSelect');
+
+            if (this.value === 'Building') {
+                document.getElementById('floorSelectionSection').style.display = 'block';
+                floorSelect.innerHTML = '<option value="">Select Floor</option>';
+
+                // Populate floor dropdown
+                Object.keys(floorAndRooms).forEach(floor => {
+                    const option = document.createElement('option');
+                    option.value = floor;
+                    option.textContent = floor;
+                    floorSelect.appendChild(option);
+                });
+
+            } else {
+                document.getElementById('floorSelectionSection').style.display = 'none';
+                document.getElementById('roomSelectionSection').style.display = 'none';
+            }
+        });
+
+        document.getElementById('floorSelect').addEventListener('change', function () {
+            const selectedFloor = this.value;
+            const roomSelect = document.getElementById('roomSelect');
+
+            if (selectedFloor) {
+                document.getElementById('roomSelectionSection').style.display = 'block';
+                roomSelect.innerHTML = '<option value="">Select Room</option>';
+
+                // Populate room dropdown
+                floorAndRooms[selectedFloor].forEach(room => {
+                    const option = document.createElement('option');
+                    option.value = room;
+                    option.textContent = room;
+                    roomSelect.appendChild(option);
+                });
+            } else {
+                document.getElementById('roomSelectionSection').style.display = 'none';
+            }
+        });
+
+        document.getElementById('assetForm').addEventListener('submit', function (event) {
+            event.preventDefault();
+            const assetCategory = document.getElementById('assetCategoryName').value;
+            const selectedFloor = document.getElementById('floorSelect').value;
+            const selectedRoom = document.getElementById('roomSelect').value;
+
+            if (assetCategory && selectedFloor && selectedRoom) {
+                console.log("Selected Data:", {
+                    assetCategory: assetCategory,
+                    floor: selectedFloor,
+                    room: selectedRoom
+                });
+            } else {
+                alert("Please select all fields before submitting.");
+            }
+        });
+    </script>
+
+</body>
+</html>

@@ -2,21 +2,7 @@ package bt.nhdcl.assetmicroservice.entity;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
-
-import com.google.zxing.BarcodeFormat;
-import com.google.zxing.EncodeHintType;
-import com.google.zxing.MultiFormatWriter;
-import com.google.zxing.WriterException;
-import com.google.zxing.client.j2se.MatrixToImageWriter;
-import com.google.zxing.common.BitMatrix;
-
-import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
-import java.util.Base64;
-import java.util.HashMap;
-import java.util.Map;
-import java.awt.image.BufferedImage;
-import javax.imageio.ImageIO;
 import java.util.List;
 
 @Document(collection = "assets")
@@ -34,9 +20,10 @@ public class Asset {
     private String status;
     private String createdBy;
     private String deletedBy;
-    private int academyID;
-    private String assetCategoryName;
+    private String academyID;
+    private String assetCategoryID;
     private List<Attribute> attributes;
+    private Category categoryDetails;
 
     // No-argument constructor
     public Asset() {
@@ -45,7 +32,7 @@ public class Asset {
     // Parameterized constructor
     public Asset(String assetCode, int assetID, String title, int cost, String acquireDate, String lifespan,
             String assetArea, String description, String status, String createdBy, String deletedBy,
-            int academyID, String assetCategoryName, List<Attribute> attributes) {
+            String academyID, String assetCategoryID, List<Attribute> attributes) {
         System.out.println("Asset constructor called for: " + assetCode); // Debugging statement
         this.assetCode = assetCode;
         this.assetID = assetID;
@@ -59,66 +46,26 @@ public class Asset {
         this.createdBy = createdBy;
         this.deletedBy = deletedBy;
         this.academyID = academyID;
-        this.assetCategoryName = assetCategoryName;
+        this.assetCategoryID = assetCategoryID;
         if (attributes == null) {
             this.attributes = new ArrayList<>();
         } else {
             this.attributes = attributes;
         }
-        
+
     }
 
-    private boolean isExcludedCategory(String category) {
-        return category != null && (category.equalsIgnoreCase("Building") ||
-                category.equalsIgnoreCase("Landscaping") ||
-                category.equalsIgnoreCase("Infrastructure") ||
-                category.equalsIgnoreCase("Facilities"));
+    public Category getCategoryDetails() {
+        return categoryDetails;
+    }
+    
+    public void setCategoryDetails(Category categoryDetails) {
+        this.categoryDetails = categoryDetails;
     }
 
-    private void generateQRCodeIfNeeded() {
-        if (!isExcludedCategory(this.assetCategoryName)) {
-            addQRCodeToAttributes();
-        }
-    }
-
-    private void addQRCodeToAttributes() {
-        String qrData = "Asset Code: " + assetCode +
-                ", Title: " + title +
-                ", Category: " + assetCategoryName;
-        String qrBase64 = generateQRCode(qrData);
-
-        if (qrBase64 != null) {
-            Attribute qrAttribute = new Attribute("QR Code", qrBase64);
-            this.attributes.add(qrAttribute);
-        }
-    }
-
-    private String generateQRCode(String text) {
-        try {
-            int width = 200;
-            int height = 200;
-            Map<EncodeHintType, Object> hints = new HashMap<>();
-            hints.put(EncodeHintType.CHARACTER_SET, "UTF-8");
-
-            BitMatrix bitMatrix = new MultiFormatWriter().encode(text, BarcodeFormat.QR_CODE, width, height, hints);
-            BufferedImage qrImage = MatrixToImageWriter.toBufferedImage(bitMatrix);
-
-            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-            ImageIO.write(qrImage, "png", outputStream);
-            byte[] imageBytes = outputStream.toByteArray();
-
-            return Base64.getEncoder().encodeToString(imageBytes);
-        } catch (WriterException | java.io.IOException e) {
-            e.printStackTrace();
-            return null;
-        }
-    }
-
-    // This method will be used to ensure QR code generation after loading from
-    // MongoDB
-    public void ensureQRCodeGeneration() {
-        if (!isExcludedCategory(this.assetCategoryName)) {
-            addQRCodeToAttributes();
+    public void addQRCodeAttribute(String qrLabel, String qrUrl) {
+        if (qrUrl != null) {
+            this.attributes.add(new Attribute(qrLabel, qrUrl));
         }
     }
 
@@ -224,21 +171,21 @@ public class Asset {
         this.deletedBy = deletedBy;
     }
 
-    public int getAcademyID() {
+    public String getAcademyID() {
         return academyID;
     }
 
-    public void setAcademyID(int academyID) {
+    public void setAcademyID(String academyID) {
         this.academyID = academyID;
     }
 
-    public String getAssetCategoryName() {
-        return assetCategoryName;
+    public String getAssetCategoryID() {
+        return assetCategoryID;
     }
 
-    public void setAssetCategoryName(String assetCategoryName) {
-        this.assetCategoryName = assetCategoryName;
-        
+    public void setAssetCategoryID(String assetCategoryID) {
+        this.assetCategoryID = assetCategoryID;
+
     }
 
     public List<Attribute> getAttributes() {
@@ -247,7 +194,5 @@ public class Asset {
 
     public void setAttributes(List<Attribute> attributes) {
         this.attributes = attributes;
-        // Generate QR code if necessary
-        generateQRCodeIfNeeded();
     }
 }

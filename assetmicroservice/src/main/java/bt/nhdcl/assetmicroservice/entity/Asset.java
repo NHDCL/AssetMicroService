@@ -34,7 +34,7 @@ public class Asset {
     private String status;
     private String createdBy;
     private String deletedBy;
-    private int academyID;
+    private String academyID;
     private String assetCategoryName;
     private List<Attribute> attributes;
 
@@ -45,7 +45,7 @@ public class Asset {
     // Parameterized constructor
     public Asset(String assetCode, int assetID, String title, int cost, String acquireDate, String lifespan,
             String assetArea, String description, String status, String createdBy, String deletedBy,
-            int academyID, String assetCategoryName, List<Attribute> attributes) {
+            String academyID, String assetCategoryName, List<Attribute> attributes) {
         System.out.println("Asset constructor called for: " + assetCode); // Debugging statement
         this.assetCode = assetCode;
         this.assetID = assetID;
@@ -65,7 +65,7 @@ public class Asset {
         } else {
             this.attributes = attributes;
         }
-        
+
     }
 
     private boolean isExcludedCategory(String category) {
@@ -224,11 +224,11 @@ public class Asset {
         this.deletedBy = deletedBy;
     }
 
-    public int getAcademyID() {
+    public String getAcademyID() {
         return academyID;
     }
 
-    public void setAcademyID(int academyID) {
+    public void setAcademyID(String academyID) {
         this.academyID = academyID;
     }
 
@@ -238,7 +238,7 @@ public class Asset {
 
     public void setAssetCategoryName(String assetCategoryName) {
         this.assetCategoryName = assetCategoryName;
-        
+
     }
 
     public List<Attribute> getAttributes() {

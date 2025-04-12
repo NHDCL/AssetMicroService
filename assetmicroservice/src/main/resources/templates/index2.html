@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asset Form</title>
+</head>
+<body>
+
+    <form id="assetForm">
+        <div>
+            <label>Asset Code:</label>
+            <input type="text" id="assetCode" name="assetCode">
+        </div>
+
+        <div>
+            <label>Title:</label>
+            <input type="text" id="title" name="title">
+        </div>
+
+        <div>
+            <label>Asset Category Name:</label>
+            <select id="assetCategoryName" name="assetCategoryName">
+                <option value="">Select Category</option>
+                <option value="Building">Building</option>
+            </select>
+        </div>
+
+        <div id="floorRoomSection" style="display: none;">
+            <h3>Floor and Room Data</h3>
+
+            <div>
+                <label>Floor Name:</label>
+                <input type="text" id="floorInput" placeholder="Enter floor name (e.g., First Floor)">
+            </div>
+
+            <div>
+                <label>Room Name:</label>
+                <input type="text" id="roomInput" placeholder="Enter room name (e.g., Room 101)">
+                <button type="button" onclick="addRoom()">Add Room</button>
+            </div>
+
+            <div>
+                <h4>Current Floor and Room Data:</h4>
+                <pre id="floorRoomData"></pre>
+            </div>
+        </div>
+
+        <button type="submit">Submit</button>
+    </form>
+
+    <script>
+        let floorAndRooms = {};
+
+        document.getElementById('assetCategoryName').addEventListener('change', function () {
+            const section = document.getElementById('floorRoomSection');
+            if (this.value === 'Building') {
+                section.style.display = 'block';
+            } else {
+                section.style.display = 'none';
+                floorAndRooms = {}; // Reset floor and room data
+            }
+        });
+
+        function addRoom() {
+            const floorInput = document.getElementById('floorInput').value.trim();
+            const roomInput = document.getElementById('roomInput').value.trim();
+
+            if (floorInput && roomInput) {
+                if (!floorAndRooms[floorInput]) {
+                    floorAndRooms[floorInput] = [];
+                }
+                floorAndRooms[floorInput].push(roomInput);
+                document.getElementById('floorRoomData').textContent = JSON.stringify(floorAndRooms, null, 2);
+                document.getElementById('roomInput').value = '';
+            }
+        }
+
+        document.getElementById('assetForm').addEventListener('submit', function (event) {
+            event.preventDefault();
+            const formData = {
+                assetCode: document.getElementById('assetCode').value,
+                title: document.getElementById('title').value,
+                assetCategoryName: document.getElementById('assetCategoryName').value,
+                floorAndRooms: floorAndRooms
+            };
+            console.log('Form Submitted:', JSON.stringify(formData, null, 2));
+        });
+    </script>
+
+</body>
+</html>

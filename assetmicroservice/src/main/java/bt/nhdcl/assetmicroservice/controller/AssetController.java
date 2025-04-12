@@ -18,12 +18,23 @@ public class AssetController {
 
     @PostMapping
     public Asset createAsset(@RequestBody Asset asset) {
+        assetService.generateQRCodeForAsset(asset);
         return assetService.saveAsset(asset);
     }
 
     @GetMapping("/{assetCode}")
-    public Asset getAsset(@PathVariable String assetCode) {
-        return assetService.getAssetByAssetCode(assetCode);
+    public ResponseEntity<Asset> getAsset(@PathVariable String assetCode) {
+        Asset asset = assetService.getAssetByAssetCode(assetCode);
+        return asset != null ? ResponseEntity.ok(asset) : ResponseEntity.notFound().build();
+    }
+
+    @GetMapping("/academy/{academyID}")
+    public ResponseEntity<List<Asset>> getAssetsByAcademyID(@PathVariable String academyID) {
+        List<Asset> assets = assetService.getAssetsByAcademyID(academyID);
+        if (assets.isEmpty()) {
+            return ResponseEntity.noContent().build();  // 204 No Content if no assets are found
+        }
+        return ResponseEntity.ok(assets);  // 200 OK with the assets list
     }
 
     @GetMapping
@@ -32,24 +43,39 @@ public class AssetController {
     }
 
     @PutMapping("/{assetCode}")
-    public Asset updateAsset(@PathVariable String assetCode, @RequestBody Asset asset) {
-        asset.setAssetCode(assetCode); // Ensure the asset code is set before updating
-        return assetService.updateAsset(asset);
+    public ResponseEntity<Asset> updateAsset(@PathVariable String assetCode, @RequestBody Asset asset) {
+        asset.setAssetCode(assetCode); // Ensure asset code is set before updating
+        Asset updatedAsset = assetService.updateAsset(asset);
+
+        return updatedAsset != null ? ResponseEntity.ok(updatedAsset) : ResponseEntity.notFound().build();
     }
 
     @DeleteMapping("/{assetCode}")
-    public void deleteAsset(@PathVariable String assetCode) {
+    public ResponseEntity<Void> deleteAsset(@PathVariable String assetCode) {
         assetService.deleteAsset(assetCode);
+        return ResponseEntity.noContent().build(); // 204 No Content
     }
 
     @PostMapping("/{assetID}/upload")
-    public ResponseEntity<Asset> uploadFile(
+    public ResponseEntity<?> uploadFile(
             @PathVariable int assetID,
             @RequestParam("file") MultipartFile file) {
-        // Handle the file upload
-        Asset updatedAsset = assetService.uploadFileToAsset(assetID, file);
+        try {
+            Asset updatedAsset = assetService.uploadFileToAsset(assetID, file);
+            return ResponseEntity.ok(updatedAsset);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(404).body("Asset not found or file upload failed: " + e.getMessage());
+        }
+    }
 
-        return ResponseEntity.ok(updatedAsset);
+    @PostMapping("/upload/excel")
+    public ResponseEntity<String> uploadExcel(@RequestParam("file") MultipartFile file) {
+        try {
+            assetService.processExcelFile(file);
+            return ResponseEntity.ok("Excel file processed successfully");
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error processing Excel file: " + e.getMessage());
+        }
     }
 
 }

@@ -2,15 +2,34 @@ package bt.nhdcl.assetmicroservice.service;
 
 import bt.nhdcl.assetmicroservice.entity.Asset;
 import bt.nhdcl.assetmicroservice.repository.AssetRepository;
+import bt.nhdcl.assetmicroservice.repository.CategoryRepository;
+
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.bson.Document;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.LookupOperation;
 import org.springframework.stereotype.Service;
 import org.springframework.data.domain.Sort;
+import bt.nhdcl.assetmicroservice.entity.Attribute;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+
+import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
 public class AssetServiceImpl implements AssetService {
@@ -24,6 +43,81 @@ public class AssetServiceImpl implements AssetService {
     @Autowired
     private CloudinaryService cloudinaryService;
 
+    @Autowired
+    private QRCodeService qrCodeService;
+
+    @Autowired
+    private CategoryRepository categoryRepository;
+
+    @Autowired
+    public void AssetService(QRCodeService qrCodeService) {
+        this.qrCodeService = qrCodeService;
+    }
+
+    public void generateQRCodeForAsset(Asset asset) {
+        // Fetch category name using assetCategoryID
+        String categoryName = categoryRepository.findById(asset.getAssetCategoryID())
+                .map(c -> c.getName()) // Assuming your Category class has a `getName()` method
+                .orElse("Unknown");
+
+        if ("Building".equalsIgnoreCase(categoryName)) {
+            generateQRCodeForBuilding(asset);
+        } else if (!isExcludedCategory(categoryName)) {
+            generateQRCodeForOtherCategories(asset, categoryName);
+        }
+    }
+
+    private boolean isExcludedCategory(String category) {
+        return "Infrastructure".equalsIgnoreCase(category) || "Facility".equalsIgnoreCase(category);
+    }
+
+    private void generateQRCodeForBuilding(Asset asset) {
+        // Check if the "Floor and rooms" attribute exists
+        for (Attribute attr : asset.getAttributes()) {
+            if ("Floor and rooms".equalsIgnoreCase(attr.getName())) {
+                try {
+                    ObjectMapper objectMapper = new ObjectMapper();
+                    // Parse the JSON structure for floor and rooms
+                    // Assuming the attribute value is a JSON string like: {"Floor 1": ["Room 101",
+                    // "Room 102"], "Floor 2": ["Room 201"]}
+                    var floorsAndRooms = objectMapper.readValue(attr.getValue(),
+                            new TypeReference<Map<String, List<String>>>() {
+                            });
+
+                    // Iterate over floors and rooms and generate QR codes for each room
+                    for (Map.Entry<String, List<String>> entry : floorsAndRooms.entrySet()) {
+                        String floor = entry.getKey();
+                        for (String room : entry.getValue()) {
+                            String qrData = "Asset Code: " + asset.getAssetCode() +
+                                    ", Floor: " + floor + ", Room: " + room;
+                            String qrUrl = qrCodeService.generateQRCode(qrData); // Call QRCodeService
+
+                            if (qrUrl != null) {
+                                // Add the QR code URL as an attribute for the room
+                                asset.addQRCodeAttribute("QR Code - Room " + room, qrUrl);
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                break; // Once we process "Floor and rooms", no need to check further attributes
+            }
+        }
+    }
+
+    private void generateQRCodeForOtherCategories(Asset asset, String categoryName) {
+        String qrData = "Asset Code: " + asset.getAssetCode() +
+                ", Title: " + asset.getTitle() +
+                ", Category: " + categoryName;
+
+        String qrUrl = qrCodeService.generateQRCode(qrData);
+
+        if (qrUrl != null) {
+            asset.addQRCodeAttribute("QR Code", qrUrl);
+        }
+    }
+
     @Override
     public Asset saveAsset(Asset asset) {
         // Get the next asset ID and set it automatically
@@ -34,12 +128,56 @@ public class AssetServiceImpl implements AssetService {
 
     @Override
     public Asset getAssetByAssetCode(String assetCode) {
-        return assetRepository.findByAssetCode(assetCode);
+        AggregationOperation lookupOperation = context -> new Document("$lookup",
+                new Document("from", "categories")
+                        .append("let", new Document("catId", new Document("$toObjectId", "$assetCategoryID")))
+                        .append("pipeline", List.of(
+                                new Document("$match", new Document("$expr",
+                                        new Document("$eq", List.of("$_id", "$$catId"))))))
+                        .append("as", "categoryDetails"));
+
+        Aggregation aggregation = Aggregation.newAggregation(
+                Aggregation.match(Criteria.where("assetCode").is(assetCode)),
+                lookupOperation,
+                Aggregation.unwind("categoryDetails", true));
+
+        List<Asset> assets = mongoTemplate.aggregate(aggregation, "assets", Asset.class).getMappedResults();
+        return assets.isEmpty() ? null : assets.get(0);
+    }
+
+    @Override
+    public List<Asset> getAssetsByAcademyID(String academyID) {
+        AggregationOperation lookupOperation = context -> new Document("$lookup",
+                new Document("from", "categories")
+                        .append("let", new Document("catId", new Document("$toObjectId", "$assetCategoryID")))
+                        .append("pipeline", List.of(
+                                new Document("$match", new Document("$expr",
+                                        new Document("$eq", List.of("$_id", "$$catId"))))))
+                        .append("as", "categoryDetails"));
+
+        Aggregation aggregation = Aggregation.newAggregation(
+                Aggregation.match(Criteria.where("academyID").is(academyID)),
+                lookupOperation,
+                Aggregation.unwind("categoryDetails", true));
+
+        return mongoTemplate.aggregate(aggregation, "assets", Asset.class).getMappedResults();
     }
 
     @Override
     public List<Asset> getAllAssets() {
-        return assetRepository.findAll();
+        AggregationOperation lookupOperation = context -> new Document("$lookup",
+                new Document("from", "categories")
+                        .append("let", new Document("catId", new Document("$toObjectId", "$assetCategoryID")))
+                        .append("pipeline", List.of(
+                                new Document("$match", new Document("$expr",
+                                        new Document("$eq", List.of("$_id", "$$catId"))))))
+                        .append("as", "categoryDetails"));
+
+        Aggregation aggregation = Aggregation.newAggregation(
+                lookupOperation,
+                Aggregation.unwind("categoryDetails", true));
+
+        return mongoTemplate.aggregate(aggregation, "assets", Asset.class).getMappedResults();
     }
 
     @Override
@@ -62,16 +200,134 @@ public class AssetServiceImpl implements AssetService {
         return latestAsset == null ? 1 : latestAsset.getAssetID() + 1;
     }
 
+    @Override
     public Asset uploadFileToAsset(int assetID, MultipartFile file) {
         Optional<Asset> assetOptional = assetRepository.findByAssetID(assetID);
         if (assetOptional.isEmpty()) {
             throw new RuntimeException("Asset not found");
         }
-    
+
         Asset asset = assetOptional.get();
         String fileUrl = cloudinaryService.uploadFile(file); // Upload file to Cloudinary
         asset.addFileAttribute(fileUrl); // Add file URL as an attribute
-    
+
         return assetRepository.save(asset); // Save updated asset
     }
+
+    @Override
+    public void processExcelFile(MultipartFile file) throws IOException {
+        try (InputStream is = file.getInputStream();
+                Workbook workbook = new XSSFWorkbook(is)) {
+
+            Sheet sheet = workbook.getSheetAt(0);
+            Iterator<Row> rowIterator = sheet.iterator();
+
+            if (!rowIterator.hasNext())
+                return;
+
+            // Step 1: Read header row and map headers to their column index
+            Row headerRow = rowIterator.next();
+            Map<String, Integer> headerIndexMap = new HashMap<>();
+            for (Cell cell : headerRow) {
+                headerIndexMap.put(cell.getStringCellValue().trim(), cell.getColumnIndex());
+            }
+
+            // Step 2: Process each row
+            while (rowIterator.hasNext()) {
+                Row row = rowIterator.next();
+                if (row == null)
+                    continue;
+
+                Asset asset = new Asset();
+
+                // Step 3: Auto-generate Asset ID
+                Integer assetID = getNextAssetID(); // Auto-generate the Asset ID
+                asset.setAssetIDAuto(assetID); // Set the auto-generated Asset ID
+
+                // Set other fields from the row (from the Excel file)
+                asset.setAssetCode(getCellValueAsString(row.getCell(headerIndexMap.get("assetCode"))));
+                asset.setTitle(getCellValueAsString(row.getCell(headerIndexMap.get("title"))));
+                asset.setCost((int) getCellValueAsDouble(row.getCell(headerIndexMap.get("cost"))));
+                asset.setAcquireDate(getCellValueAsString(row.getCell(headerIndexMap.get("acquireDate"))));
+                asset.setLifespan(getCellValueAsString(row.getCell(headerIndexMap.get("lifespan"))));
+                asset.setAssetArea(getCellValueAsString(row.getCell(headerIndexMap.get("assetArea"))));
+                asset.setDescription(getCellValueAsString(row.getCell(headerIndexMap.get("description"))));
+                asset.setStatus(getCellValueAsString(row.getCell(headerIndexMap.get("status"))));
+                asset.setCreatedBy(getCellValueAsString(row.getCell(headerIndexMap.get("createdBy"))));
+                asset.setAcademyID(getCellValueAsString(row.getCell(headerIndexMap.get("academyID"))));
+                asset.setAssetCategoryID(getCellValueAsString(row.getCell(headerIndexMap.get("assetCategoryID"))));
+
+                // Step 4: Collect dynamic attributes only if they have a value
+                List<Attribute> attributes = new ArrayList<>();
+                for (Map.Entry<String, Integer> entry : headerIndexMap.entrySet()) {
+                    String key = entry.getKey();
+                    int colIndex = entry.getValue();
+
+                    // Skip fixed fields
+                    if (List.of("assetCode", "title", "cost", "acquireDate", "lifespan",
+                            "assetArea", "description", "status", "createdBy",
+                            "academyID", "assetCategoryID").contains(key)) {
+                        continue;
+                    }
+
+                    String value = getCellValueAsString(row.getCell(colIndex));
+                    if (value != null && !value.trim().isEmpty()) {
+                        // Only add attribute if it has a value
+                        attributes.add(new Attribute(key, value));
+                    }
+                }
+
+                asset.setAttributes(attributes);
+
+                // Step 5: Generate QR Code for the asset (if needed)
+                generateQRCodeForAsset(asset);
+
+                // Step 6: Save the asset to the repository
+                assetRepository.save(asset);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new IOException("Error processing Excel file", e);
+        }
+    }
+
+    private String getCellValueAsString(Cell cell) {
+        if (cell == null)
+            return null;
+
+        switch (cell.getCellType()) {
+            case STRING:
+                return cell.getStringCellValue().trim();
+            case NUMERIC:
+                if (DateUtil.isCellDateFormatted(cell)) {
+                    return cell.getDateCellValue().toString(); // or format as needed
+                } else {
+                    return String.valueOf((int) cell.getNumericCellValue());
+                }
+            case BOOLEAN:
+                return String.valueOf(cell.getBooleanCellValue());
+            case FORMULA:
+                return cell.getCellFormula();
+            case BLANK:
+            default:
+                return null;
+        }
+    }
+
+    private double getCellValueAsDouble(Cell cell) {
+        if (cell == null)
+            return 0.0;
+
+        if (cell.getCellType() == CellType.NUMERIC) {
+            return cell.getNumericCellValue();
+        } else if (cell.getCellType() == CellType.STRING) {
+            try {
+                return Double.parseDouble(cell.getStringCellValue().trim());
+            } catch (NumberFormatException e) {
+                return 0.0;
+            }
+        }
+        return 0.0;
+    }
+
 }

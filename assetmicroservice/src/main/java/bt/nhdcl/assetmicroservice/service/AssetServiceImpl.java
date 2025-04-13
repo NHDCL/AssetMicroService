@@ -3,22 +3,24 @@ package bt.nhdcl.assetmicroservice.service;
 import bt.nhdcl.assetmicroservice.entity.Asset;
 import bt.nhdcl.assetmicroservice.repository.AssetRepository;
 import bt.nhdcl.assetmicroservice.repository.CategoryRepository;
-
+import bt.nhdcl.assetmicroservice.config.CloudinaryConfig;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.bson.Document;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.aggregation.LookupOperation;
 import org.springframework.stereotype.Service;
 import org.springframework.data.domain.Sort;
 import bt.nhdcl.assetmicroservice.entity.Attribute;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Date;
+import java.text.SimpleDateFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 
@@ -41,7 +43,7 @@ public class AssetServiceImpl implements AssetService {
     private MongoTemplate mongoTemplate;
 
     @Autowired
-    private CloudinaryService cloudinaryService;
+    private CloudinaryConfig cloudinaryConfig;
 
     @Autowired
     private QRCodeService qrCodeService;
@@ -200,18 +202,41 @@ public class AssetServiceImpl implements AssetService {
         return latestAsset == null ? 1 : latestAsset.getAssetID() + 1;
     }
 
-    @Override
-    public Asset uploadFileToAsset(int assetID, MultipartFile file) {
-        Optional<Asset> assetOptional = assetRepository.findByAssetID(assetID);
-        if (assetOptional.isEmpty()) {
-            throw new RuntimeException("Asset not found");
+    public Asset uploadAssetImagesToAttributes(int assetID, MultipartFile[] files) throws IOException {
+        Optional<Asset> optionalAsset = assetRepository.findByAssetID(assetID);
+        if (optionalAsset.isEmpty()) {
+            throw new RuntimeException("Asset not found with assetID: " + assetID);
         }
 
-        Asset asset = assetOptional.get();
-        String fileUrl = cloudinaryService.uploadFile(file); // Upload file to Cloudinary
-        asset.addFileAttribute(fileUrl); // Add file URL as an attribute
+        Asset asset = optionalAsset.get();
+        List<Attribute> attributes = asset.getAttributes() != null ? asset.getAttributes() : new ArrayList<>();
 
-        return assetRepository.save(asset); // Save updated asset
+        // Find max index for imageN
+        int maxImageIndex = attributes.stream()
+                .filter(attr -> attr.getName().startsWith("image"))
+                .map(attr -> attr.getName().replace("image", ""))
+                .filter(s -> s.matches("\\d+"))
+                .mapToInt(Integer::parseInt)
+                .max()
+                .orElse(0);
+
+        for (int i = 0; i < files.length; i++) {
+            MultipartFile file = files[i];
+            // Call the uploadFile method to get the upload result as Map
+            Map<String, Object> uploadResult = cloudinaryConfig.uploadFile(file);
+
+            // Retrieve the image URL from the result
+            String imageUrl = (String) uploadResult.get("secure_url");
+
+            // Add the new image attribute with the URL
+            attributes.add(new Attribute("image" + (maxImageIndex + i + 1), imageUrl));
+        }
+
+        // Set the updated attributes to the asset
+        asset.setAttributes(attributes);
+
+        // Save and return the updated asset
+        return assetRepository.save(asset);
     }
 
     @Override
@@ -300,7 +325,10 @@ public class AssetServiceImpl implements AssetService {
                 return cell.getStringCellValue().trim();
             case NUMERIC:
                 if (DateUtil.isCellDateFormatted(cell)) {
-                    return cell.getDateCellValue().toString(); // or format as needed
+                    // Format the date explicitly
+                    Date date = cell.getDateCellValue();
+                    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd"); // or "dd/MM/yyyy"
+                    return sdf.format(date);
                 } else {
                     return String.valueOf((int) cell.getNumericCellValue());
                 }
@@ -328,6 +356,12 @@ public class AssetServiceImpl implements AssetService {
             }
         }
         return 0.0;
+    }
+
+    @Override
+    public Asset getAssetByCode(String assetCode) {
+        return assetRepository.findByAssetCode(assetCode)
+                .orElseThrow(() -> new RuntimeException("Asset not found for assetCode: " + assetCode));
     }
 
 }

@@ -6,8 +6,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.http.HttpStatus;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/assets")
@@ -32,9 +35,9 @@ public class AssetController {
     public ResponseEntity<List<Asset>> getAssetsByAcademyID(@PathVariable String academyID) {
         List<Asset> assets = assetService.getAssetsByAcademyID(academyID);
         if (assets.isEmpty()) {
-            return ResponseEntity.noContent().build();  // 204 No Content if no assets are found
+            return ResponseEntity.noContent().build(); // 204 No Content if no assets are found
         }
-        return ResponseEntity.ok(assets);  // 200 OK with the assets list
+        return ResponseEntity.ok(assets); // 200 OK with the assets list
     }
 
     @GetMapping
@@ -56,25 +59,50 @@ public class AssetController {
         return ResponseEntity.noContent().build(); // 204 No Content
     }
 
-    @PostMapping("/{assetID}/upload")
-    public ResponseEntity<?> uploadFile(
+    @PostMapping("/{assetID}/upload-images")
+    public ResponseEntity<?> uploadImagesAsAttributes(
             @PathVariable int assetID,
-            @RequestParam("file") MultipartFile file) {
+            @RequestParam("images") MultipartFile[] images) {
         try {
-            Asset updatedAsset = assetService.uploadFileToAsset(assetID, file);
+            Asset updatedAsset = assetService.uploadAssetImagesToAttributes(assetID, images);
             return ResponseEntity.ok(updatedAsset);
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(404).body("Asset not found or file upload failed: " + e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error uploading images: " + e.getMessage());
         }
     }
 
     @PostMapping("/upload/excel")
-    public ResponseEntity<String> uploadExcel(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<Map<String, String>> uploadExcel(@RequestParam("file") MultipartFile file) {
         try {
             assetService.processExcelFile(file);
-            return ResponseEntity.ok("Excel file processed successfully");
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "Excel file processed successfully");
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
-            return ResponseEntity.status(500).body("Error processing Excel file: " + e.getMessage());
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("message", "Error processing Excel file: " + e.getMessage());
+            return ResponseEntity.status(500).body(errorResponse);
+        }
+    }
+
+    @PostMapping("/find")
+    public ResponseEntity<?> findByAssetCode(@RequestBody Map<String, String> request) {
+        String assetCode = request.get("assetCode");
+
+        if (assetCode != null) {
+            try {
+                Asset asset = assetService.getAssetByCode(assetCode);
+                if (asset != null) {
+                    return ResponseEntity.ok(asset);
+                } else {
+                    return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Asset not found");
+                }
+            } catch (Exception e) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An error occurred");
+            }
+        } else {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("AssetCode is required");
         }
     }
 

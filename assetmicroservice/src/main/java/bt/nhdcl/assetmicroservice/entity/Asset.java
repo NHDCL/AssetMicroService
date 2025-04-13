@@ -22,18 +22,17 @@ public class Asset {
     private String deletedBy;
     private String academyID;
     private String assetCategoryID;
-    private List<Attribute> attributes;
+    private List<Attribute> attributes; // Can be null
     private Category categoryDetails;
 
     // No-argument constructor
     public Asset() {
     }
 
-    // Parameterized constructor
+    // Parameterized constructor, allows attributes to be null
     public Asset(String assetCode, int assetID, String title, int cost, String acquireDate, String lifespan,
             String assetArea, String description, String status, String createdBy, String deletedBy,
             String academyID, String assetCategoryID, List<Attribute> attributes) {
-        System.out.println("Asset constructor called for: " + assetCode); // Debugging statement
         this.assetCode = assetCode;
         this.assetID = assetID;
         this.title = title;
@@ -47,34 +46,42 @@ public class Asset {
         this.deletedBy = deletedBy;
         this.academyID = academyID;
         this.assetCategoryID = assetCategoryID;
-        if (attributes == null) {
-            this.attributes = new ArrayList<>();
-        } else {
-            this.attributes = attributes;
-        }
-
+        this.attributes = attributes; // Allow null here
     }
 
     public Category getCategoryDetails() {
         return categoryDetails;
     }
-    
+
     public void setCategoryDetails(Category categoryDetails) {
         this.categoryDetails = categoryDetails;
     }
 
+    // Method to add QRCode Attribute
     public void addQRCodeAttribute(String qrLabel, String qrUrl) {
+        // If attributes is null, initialize it to avoid NullPointerException
+        if (this.attributes == null) {
+            this.attributes = new ArrayList<>();
+        }
+        
         if (qrUrl != null) {
             this.attributes.add(new Attribute(qrLabel, qrUrl));
         }
     }
 
+    // Method to add File Attribute
     public void addFileAttribute(String fileUrl) {
+        // If attributes is null, initialize it to avoid NullPointerException
+        if (this.attributes == null) {
+            this.attributes = new ArrayList<>();
+        }
+
         if (fileUrl != null && !fileUrl.isEmpty()) {
             this.attributes.add(new Attribute("file", fileUrl));
         }
     }
 
+    // Method to automatically set Asset ID if it is not set
     public void setAssetIDAuto(int nextAssetID) {
         if (this.assetID == 0) { // If assetID is not provided
             this.assetID = nextAssetID; // Set the new assetID
@@ -82,6 +89,7 @@ public class Asset {
     }
 
     // Getters and Setters
+
     public String getAssetCode() {
         return assetCode;
     }
@@ -98,7 +106,6 @@ public class Asset {
         this.assetID = assetID;
     }
 
-    // Other getters and setters...
     public String getTitle() {
         return title;
     }
@@ -185,14 +192,13 @@ public class Asset {
 
     public void setAssetCategoryID(String assetCategoryID) {
         this.assetCategoryID = assetCategoryID;
-
     }
 
     public List<Attribute> getAttributes() {
-        return attributes;
+        return attributes; // Can be null
     }
 
     public void setAttributes(List<Attribute> attributes) {
-        this.attributes = attributes;
+        this.attributes = attributes; // Can be null
     }
 }

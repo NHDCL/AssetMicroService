@@ -9,7 +9,7 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface AssetRepository extends MongoRepository<Asset, String> {
-    Asset findByAssetCode(String assetCode);
+    Optional<Asset> findByAssetCode(String assetCode);
     Optional<Asset> findByAssetID(int assetID);
     List<Asset> findByAcademyID(String academyID);
 }

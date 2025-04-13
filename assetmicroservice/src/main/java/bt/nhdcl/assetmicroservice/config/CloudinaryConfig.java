@@ -5,6 +5,10 @@ import com.cloudinary.utils.ObjectUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.util.Map;
 
 @Configuration
 public class CloudinaryConfig {
@@ -25,5 +29,14 @@ public class CloudinaryConfig {
                 "api_key", apiKey,
                 "api_secret", apiSecret
         ));
+    }
+
+    // This method returns the upload result as Map<String, Object>
+    public Map<String, Object> uploadFile(MultipartFile file) throws IOException {
+        // Get Cloudinary instance
+        Cloudinary cloudinary = cloudinary();
+
+        // Upload the file to Cloudinary
+        return cloudinary.uploader().upload(file.getBytes(), ObjectUtils.emptyMap());
     }
 }

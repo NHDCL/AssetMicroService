@@ -17,4 +17,7 @@ public interface AssetService {
     Asset uploadAssetImagesToAttributes(int assetID, MultipartFile[] files) throws IOException;
     void processExcelFile(MultipartFile file) throws IOException;
     Asset getAssetByCode(String assetCode);
+    void updateStatusOrHandleAction(String assetCode, String status, String email, String action);
+    void handleAssetDeletion(String assetCode, String email, String action);
+    void softDeleteAsset(String assetCode, String email);
 }

@@ -10,7 +10,7 @@ import java.util.Optional;
 
 @Service
 public class CategoryServiceImpl implements CategoryService {
-    
+
     @Autowired
     private CategoryRepository categoryRepository;
 
@@ -38,4 +38,31 @@ public class CategoryServiceImpl implements CategoryService {
     public void deleteCategory(String id) {
         categoryRepository.deleteById(id);
     }
+
+    @Override
+    public Category updateCategory(String id, Category updatedCategory) {
+        Optional<Category> existingCategoryOpt = categoryRepository.findById(id);
+
+        if (existingCategoryOpt.isPresent()) {
+            Category existingCategory = existingCategoryOpt.get();
+            existingCategory.setName(updatedCategory.getName());
+            existingCategory.setDepreciatedValue(updatedCategory.getDepreciatedValue());
+            return categoryRepository.save(existingCategory);
+        } else {
+            throw new RuntimeException("Category not found with id: " + id);
+        }
+    }
+
+    @Override
+    public void softDeleteCategory(String id) {
+        Optional<Category> categoryOpt = categoryRepository.findById(id);
+        if (categoryOpt.isPresent()) {
+            Category category = categoryOpt.get();
+            category.setDeleted(true);
+            categoryRepository.save(category);
+        } else {
+            throw new RuntimeException("Category not found with ID: " + id);
+        }
+    }
+
 }

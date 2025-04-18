@@ -6,7 +6,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @RestController
@@ -48,4 +50,33 @@ public class CategoryController {
         categoryService.deleteCategory(id);
         return ResponseEntity.noContent().build();
     }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Category> updateCategory(
+            @PathVariable String id,
+            @RequestBody Category updatedCategory) {
+
+        Category category = categoryService.updateCategory(id, updatedCategory);
+        return ResponseEntity.ok(category);
+    }
+
+    @PutMapping("/{id}/delete")
+    public ResponseEntity<Map<String, String>> softDeleteCategory(@PathVariable String id) {
+        try {
+            categoryService.softDeleteCategory(id);
+
+            // Return a JSON response
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "Category soft-deleted successfully.");
+
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            // Return error message as JSON
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("error", e.getMessage());
+
+            return ResponseEntity.status(404).body(errorResponse);
+        }
+    }
+
 }

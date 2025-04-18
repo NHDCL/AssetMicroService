@@ -10,14 +10,16 @@ public class Category {
     private String id;
     private String name;
     private int depreciatedValue;
+    private boolean deleted;
 
     // Default constructor
     public Category() {}
 
     // Parameterized constructor
-    public Category(String name, int depreciatedValue) {
+    public Category(String name, int depreciatedValue, boolean deleted) {
         this.name = name;
         this.depreciatedValue = depreciatedValue;
+        this.deleted =deleted;
     }
 
     // Getters
@@ -44,5 +46,13 @@ public class Category {
 
     public void setDepreciatedValue(int depreciatedValue) {
         this.depreciatedValue = depreciatedValue;
+    }
+
+    public boolean getDeleted() {
+        return deleted;
+    }
+
+    public void setDeleted(boolean deleted) {
+        this.deleted = deleted;
     }
 }

@@ -20,7 +20,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 
@@ -50,6 +49,9 @@ public class AssetServiceImpl implements AssetService {
 
     @Autowired
     private CategoryRepository categoryRepository;
+
+    @Autowired
+    private EmailService emailService;
 
     @Autowired
     public void AssetService(QRCodeService qrCodeService) {
@@ -277,7 +279,7 @@ public class AssetServiceImpl implements AssetService {
                 asset.setLifespan(getCellValueAsString(row.getCell(headerIndexMap.get("lifespan"))));
                 asset.setAssetArea(getCellValueAsString(row.getCell(headerIndexMap.get("assetArea"))));
                 asset.setDescription(getCellValueAsString(row.getCell(headerIndexMap.get("description"))));
-                asset.setStatus(getCellValueAsString(row.getCell(headerIndexMap.get("status"))));
+                asset.setStatus("Pending");
                 asset.setCreatedBy(getCellValueAsString(row.getCell(headerIndexMap.get("createdBy"))));
                 asset.setAcademyID(getCellValueAsString(row.getCell(headerIndexMap.get("academyID"))));
                 asset.setAssetCategoryID(getCellValueAsString(row.getCell(headerIndexMap.get("assetCategoryID"))));
@@ -362,6 +364,94 @@ public class AssetServiceImpl implements AssetService {
     public Asset getAssetByCode(String assetCode) {
         return assetRepository.findByAssetCode(assetCode)
                 .orElseThrow(() -> new RuntimeException("Asset not found for assetCode: " + assetCode));
+    }
+
+    public void updateStatusOrHandleAction(String assetCode, String status, String email, String action) {
+        Optional<Asset> assetOpt = assetRepository.findById(assetCode);
+
+        if (assetOpt.isPresent()) {
+            Asset asset = assetOpt.get();
+
+            if ("decline".equalsIgnoreCase(action)) {
+                assetRepository.deleteById(assetCode);
+                if (email != null) {
+                    emailService.sendEmail(email, "Asset Registration Declined", "We regret to inform you that your asset registration request has been declined and the asset has been removed from the system.");
+                }
+                return; // 👈 stop further execution to avoid saving the deleted asset
+            }
+
+            if (status != null && !status.isEmpty()) {
+                asset.setStatus(status);
+            }
+
+            if ("accept".equalsIgnoreCase(action)) {
+                if (email != null) {
+                    emailService.sendEmail(email, "Asset Registration Approved",
+                            "Your asset registration request has been approved and the asset is now active in the system.");
+                }
+            }
+
+            assetRepository.save(asset);
+        } else {
+            throw new RuntimeException("Asset with code " + assetCode + " not found.");
+        }
+    }
+
+    public void handleAssetDeletion(String assetCode, String email, String action) {
+        Optional<Asset> assetOpt = assetRepository.findById(assetCode);
+
+        if (assetOpt.isPresent()) {
+            Asset asset = assetOpt.get();
+
+            // Case 1: Only assetCode is given (soft delete)
+            if (email == null && action == null) {
+                asset.setStatus("Disposed");
+                assetRepository.save(asset);
+                return;
+            }
+
+            // Case 2: Email and action are provided
+            if ("accept".equalsIgnoreCase(action)) {
+                asset.setStatus("Disposed");
+                asset.setDeleted(false);
+                assetRepository.save(asset);
+                emailService.sendEmail(
+                        email,
+                        "Asset Disposal Request Approved",
+                        "Your request to dispose of the asset has been approved. The asset has now been marked as disposed in the system.");
+            } else if ("decline".equalsIgnoreCase(action)) {
+                asset.setStatus("In Usage");
+                asset.setDeleted(false);
+                asset.setDeletedBy(null);
+                assetRepository.save(asset);
+                // No change to deleted status
+                emailService.sendEmail(
+                    email,
+                    "Asset Disposal Request Declined",
+                    "Your request to dispose of the asset has been declined. The asset will remain active in the system."
+                );
+            }
+
+        } else {
+            throw new RuntimeException("Asset with code " + assetCode + " not found.");
+        }
+    }
+
+    public void softDeleteAsset(String assetCode, String email) {
+        if (assetCode == null || assetCode.isEmpty()) {
+            throw new IllegalArgumentException("Asset code must be provided.");
+        }
+
+        Optional<Asset> optionalAsset = assetRepository.findById(assetCode);
+        if (optionalAsset.isEmpty()) {
+            throw new IllegalArgumentException("Asset not found.");
+        }
+
+        Asset asset = optionalAsset.get();
+        asset.setStatus("Pending");
+        asset.setDeleted(true);
+        asset.setDeletedBy(email);
+        assetRepository.save(asset);
     }
 
 }

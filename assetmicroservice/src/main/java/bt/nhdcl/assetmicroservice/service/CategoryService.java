@@ -10,4 +10,6 @@ public interface CategoryService {
     Category getCategoryByName(String name);
     Category saveCategory(Category category);
     void deleteCategory(String id);
+    Category updateCategory(String id, Category updatedCategory);
+    void softDeleteCategory(String id);
 }

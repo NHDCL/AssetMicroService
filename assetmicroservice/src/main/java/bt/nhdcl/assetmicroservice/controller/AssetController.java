@@ -1,6 +1,7 @@
 package bt.nhdcl.assetmicroservice.controller;
 
 import bt.nhdcl.assetmicroservice.entity.Asset;
+import bt.nhdcl.assetmicroservice.repository.AssetRepository;
 import bt.nhdcl.assetmicroservice.service.AssetService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -19,8 +20,14 @@ public class AssetController {
     @Autowired
     private AssetService assetService;
 
+    @Autowired
+    private AssetRepository assetRepository;
+
     @PostMapping
     public Asset createAsset(@RequestBody Asset asset) {
+        if (assetRepository.existsById(asset.getAssetCode())) {
+            throw new RuntimeException("Asset with code " + asset.getAssetCode() + " already exists.");
+        }
         assetService.generateQRCodeForAsset(asset);
         return assetService.saveAsset(asset);
     }
@@ -103,6 +110,61 @@ public class AssetController {
             }
         } else {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("AssetCode is required");
+        }
+    }
+
+    @PostMapping("/update-status")
+    public ResponseEntity<Map<String, String>> updateStatus(@RequestBody Map<String, String> requestData) {
+        String assetCode = requestData.get("assetCode");
+        String status = requestData.get("status");
+        String email = requestData.get("email");
+        String action = requestData.get("action");
+
+        assetService.updateStatusOrHandleAction(assetCode, status, email, action);
+
+        Map<String, String> response = new HashMap<>();
+        response.put("message", "Asset status or action processed.");
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/handle-deletion")
+    public ResponseEntity<Map<String, String>> handleAssetDeletion(@RequestBody Map<String, String> body) {
+        String assetCode = body.get("assetCode");
+        String email = body.get("email");
+        String action = body.get("action");
+
+        try {
+            assetService.handleAssetDeletion(assetCode, email, action);
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "AAsset deletion request processed.");
+            return ResponseEntity.ok(response);
+
+        } catch (RuntimeException e) {
+            Map<String, String> response = new HashMap<>();
+            response.put("message", e.getMessage());
+            return ResponseEntity.ok(response);
+        }
+    }
+
+    @PostMapping("/request-dispose")
+    public ResponseEntity<Map<String, String>> softDeleteAsset(@RequestBody Map<String, String> requestData) {
+        String assetCode = requestData.get("assetCode");
+        String email = requestData.get("email");
+        Map<String, String> response = new HashMap<>();
+
+        try {
+            assetService.softDeleteAsset(assetCode, email); // Updated to pass email too
+            response.put("status", "success");
+            response.put("message", "Asset marked as disposed and soft deleted.");
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            response.put("status", "error");
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        } catch (Exception e) {
+            response.put("status", "error");
+            response.put("message", "An unexpected error occurred.");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
 

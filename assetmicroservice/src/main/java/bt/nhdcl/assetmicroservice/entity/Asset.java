@@ -4,11 +4,13 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import java.util.ArrayList;
 import java.util.List;
+import org.springframework.data.mongodb.core.index.Indexed;
 
 @Document(collection = "assets")
 public class Asset {
 
     @Id
+    @Indexed(unique = true)
     private String assetCode; // Given by the user
     private int assetID; // Automatically generated
     private String title;
@@ -24,6 +26,7 @@ public class Asset {
     private String assetCategoryID;
     private List<Attribute> attributes; // Can be null
     private Category categoryDetails;
+    private boolean deleted;
 
     // No-argument constructor
     public Asset() {
@@ -32,7 +35,7 @@ public class Asset {
     // Parameterized constructor, allows attributes to be null
     public Asset(String assetCode, int assetID, String title, int cost, String acquireDate, String lifespan,
             String assetArea, String description, String status, String createdBy, String deletedBy,
-            String academyID, String assetCategoryID, List<Attribute> attributes) {
+            String academyID, String assetCategoryID, List<Attribute> attributes, boolean deleted) {
         this.assetCode = assetCode;
         this.assetID = assetID;
         this.title = title;
@@ -46,7 +49,8 @@ public class Asset {
         this.deletedBy = deletedBy;
         this.academyID = academyID;
         this.assetCategoryID = assetCategoryID;
-        this.attributes = attributes; // Allow null here
+        this.attributes = attributes;
+        this.deleted =deleted;
     }
 
     public Category getCategoryDetails() {
@@ -200,5 +204,13 @@ public class Asset {
 
     public void setAttributes(List<Attribute> attributes) {
         this.attributes = attributes; // Can be null
+    }
+
+    public boolean getDeleted() {
+        return deleted;
+    }
+
+    public void setDeleted(boolean deleted) {
+        this.deleted = deleted;
     }
 }

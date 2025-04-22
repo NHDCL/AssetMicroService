@@ -12,6 +12,8 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.data.domain.Sort;
 import bt.nhdcl.assetmicroservice.entity.Attribute;
+import bt.nhdcl.assetmicroservice.entity.Category;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Date;
@@ -25,7 +27,9 @@ import java.util.Iterator;
 
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
 
@@ -111,12 +115,10 @@ public class AssetServiceImpl implements AssetService {
     }
 
     private void generateQRCodeForOtherCategories(Asset asset, String categoryName) {
-        String qrData = "Asset Code: " + asset.getAssetCode() +
-                ", Title: " + asset.getTitle() +
-                ", Category: " + categoryName;
+        String baseUrl = "http://localhost:3000/qrdetail/";
+        String qrData = baseUrl + asset.getAssetCode(); // Only pass assetCode
 
         String qrUrl = qrCodeService.generateQRCode(qrData);
-
         if (qrUrl != null) {
             asset.addQRCodeAttribute("QR Code", qrUrl);
         }
@@ -132,21 +134,22 @@ public class AssetServiceImpl implements AssetService {
 
     @Override
     public Asset getAssetByAssetCode(String assetCode) {
-        AggregationOperation lookupOperation = context -> new Document("$lookup",
-                new Document("from", "categories")
-                        .append("let", new Document("catId", new Document("$toObjectId", "$assetCategoryID")))
-                        .append("pipeline", List.of(
-                                new Document("$match", new Document("$expr",
-                                        new Document("$eq", List.of("$_id", "$$catId"))))))
-                        .append("as", "categoryDetails"));
+        // 1. Find the asset using the assetCode
+        Query query = new Query(Criteria.where("assetCode").is(assetCode));
+        Asset asset = mongoTemplate.findOne(query, Asset.class, "assets");
 
-        Aggregation aggregation = Aggregation.newAggregation(
-                Aggregation.match(Criteria.where("assetCode").is(assetCode)),
-                lookupOperation,
-                Aggregation.unwind("categoryDetails", true));
+        if (asset == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Asset not found with assetCode: " + assetCode);
+        }
 
-        List<Asset> assets = mongoTemplate.aggregate(aggregation, "assets", Asset.class).getMappedResults();
-        return assets.isEmpty() ? null : assets.get(0);
+        // 2. Fetch category details using assetCategoryID
+        Object assetCategoryId = asset.getAssetCategoryID();
+        if (assetCategoryId != null) {
+            Category category = mongoTemplate.findById(assetCategoryId, Category.class, "categories");
+            asset.setCategoryDetails(category); // Make sure Asset has a setCategoryDetails() method
+        }
+
+        return asset;
     }
 
     @Override
@@ -186,11 +189,36 @@ public class AssetServiceImpl implements AssetService {
 
     @Override
     public Asset updateAsset(Asset asset) {
-        Optional<Asset> existingAsset = assetRepository.findById(asset.getAssetCode());
-        if (existingAsset.isPresent()) {
-            return assetRepository.save(asset);
+        Optional<Asset> existingAssetOpt = assetRepository.findById(asset.getAssetCode());
+        if (existingAssetOpt.isPresent()) {
+            Asset existingAsset = existingAssetOpt.get();
+
+            if (asset.getTitle() != null)
+                existingAsset.setTitle(asset.getTitle());
+            if (asset.getCost() != 0)
+                existingAsset.setCost(asset.getCost());
+            if (asset.getAcquireDate() != null)
+                existingAsset.setAcquireDate(asset.getAcquireDate());
+            if (asset.getLifespan() != null)
+                existingAsset.setLifespan(asset.getLifespan());
+            if (asset.getAssetArea() != null)
+                existingAsset.setAssetArea(asset.getAssetArea());
+            if (asset.getDescription() != null)
+                existingAsset.setDescription(asset.getDescription());
+            if (asset.getStatus() != null)
+                existingAsset.setStatus(asset.getStatus());
+            if (asset.getCreatedBy() != null)
+                existingAsset.setCreatedBy(asset.getCreatedBy());
+            if (asset.getAcademyID() != null)
+                existingAsset.setAcademyID(asset.getAcademyID());
+            if (asset.getAssetCategoryID() != null)
+                existingAsset.setAssetCategoryID(asset.getAssetCategoryID());
+            if (asset.getAttributes() != null && !asset.getAttributes().isEmpty())
+                existingAsset.setAttributes(asset.getAttributes());
+
+            return assetRepository.save(existingAsset);
         }
-        return null; // Or throw an exception if asset not found
+        return null;
     }
 
     @Override
@@ -375,7 +403,8 @@ public class AssetServiceImpl implements AssetService {
             if ("decline".equalsIgnoreCase(action)) {
                 assetRepository.deleteById(assetCode);
                 if (email != null) {
-                    emailService.sendEmail(email, "Asset Registration Declined", "We regret to inform you that your asset registration request has been declined and the asset has been removed from the system.");
+                    emailService.sendEmail(email, "Asset Registration Declined",
+                            "We regret to inform you that your asset registration request has been declined and the asset has been removed from the system.");
                 }
                 return; // 👈 stop further execution to avoid saving the deleted asset
             }
@@ -426,10 +455,9 @@ public class AssetServiceImpl implements AssetService {
                 assetRepository.save(asset);
                 // No change to deleted status
                 emailService.sendEmail(
-                    email,
-                    "Asset Disposal Request Declined",
-                    "Your request to dispose of the asset has been declined. The asset will remain active in the system."
-                );
+                        email,
+                        "Asset Disposal Request Declined",
+                        "Your request to dispose of the asset has been declined. The asset will remain active in the system.");
             }
 
         } else {

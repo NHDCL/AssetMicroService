@@ -33,9 +33,15 @@ public class AssetController {
     }
 
     @GetMapping("/{assetCode}")
-    public ResponseEntity<Asset> getAsset(@PathVariable String assetCode) {
-        Asset asset = assetService.getAssetByAssetCode(assetCode);
-        return asset != null ? ResponseEntity.ok(asset) : ResponseEntity.notFound().build();
+    public ResponseEntity<Asset> getAssetByAssetCode(@PathVariable String assetCode) {
+        try {
+            Asset asset = assetService.getAssetByAssetCode(assetCode);
+            return new ResponseEntity<>(asset, HttpStatus.OK);
+        } catch (Exception e) {
+            // Log the error to debug
+            System.out.println("Error: " + e.getMessage());
+            return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+        }
     }
 
     @GetMapping("/academy/{academyID}")

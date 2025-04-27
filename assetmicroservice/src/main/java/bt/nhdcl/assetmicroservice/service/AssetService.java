@@ -3,6 +3,7 @@ package bt.nhdcl.assetmicroservice.service;
 import bt.nhdcl.assetmicroservice.entity.Asset;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.web.multipart.MultipartFile;
 
@@ -20,4 +21,5 @@ public interface AssetService {
     void updateStatusOrHandleAction(String assetCode, String status, String email, String action);
     void handleAssetDeletion(String assetCode, String email, String action);
     void softDeleteAsset(String assetCode, String email);
+    String updateFloorAndRoomsAttribute(Map<String, Object> payload);
 }

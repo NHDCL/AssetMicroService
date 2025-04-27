@@ -16,6 +16,8 @@ import bt.nhdcl.assetmicroservice.entity.Category;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.text.SimpleDateFormat;
 import java.util.List;
@@ -52,6 +54,9 @@ public class AssetServiceImpl implements AssetService {
     private QRCodeService qrCodeService;
 
     @Autowired
+    private QRForRooms qrForRooms;
+
+    @Autowired
     private CategoryRepository categoryRepository;
 
     @Autowired
@@ -80,28 +85,38 @@ public class AssetServiceImpl implements AssetService {
     }
 
     private void generateQRCodeForBuilding(Asset asset) {
-        // Check if the "Floor and rooms" attribute exists
+        // Iterate through the attributes of the asset
         for (Attribute attr : asset.getAttributes()) {
-            if ("Floor and rooms".equalsIgnoreCase(attr.getName())) {
+            // Check if the attribute name is "Floor and Rooms"
+            if ("Floor and Rooms".equalsIgnoreCase(attr.getName())) {
                 try {
+                    // Create an ObjectMapper to parse the JSON string into a Map
                     ObjectMapper objectMapper = new ObjectMapper();
-                    // Parse the JSON structure for floor and rooms
-                    // Assuming the attribute value is a JSON string like: {"Floor 1": ["Room 101",
-                    // "Room 102"], "Floor 2": ["Room 201"]}
                     var floorsAndRooms = objectMapper.readValue(attr.getValue(),
                             new TypeReference<Map<String, List<String>>>() {
                             });
-
-                    // Iterate over floors and rooms and generate QR codes for each room
+    
+                    // Loop through each floor and its rooms
                     for (Map.Entry<String, List<String>> entry : floorsAndRooms.entrySet()) {
-                        String floor = entry.getKey();
-                        for (String room : entry.getValue()) {
-                            String qrData = "Asset Code: " + asset.getAssetCode() +
-                                    ", Floor: " + floor + ", Room: " + room;
-                            String qrUrl = qrCodeService.generateQRCode(qrData); // Call QRCodeService
-
+                        String floor = entry.getKey(); // The floor name (e.g., "Ground Floor")
+                        List<String> rooms = entry.getValue(); // List of rooms on that floor
+    
+                        // Iterate through the rooms on this floor
+                        for (String room : rooms) {
+                            // Construct the QR code data (URL)
+                            String qrData = "http://localhost:3000/roomqrdetail/" + asset.getAssetCode() +
+                                    "?floor=" + URLEncoder.encode(floor, StandardCharsets.UTF_8) +
+                                    "&room=" + URLEncoder.encode(room, StandardCharsets.UTF_8);
+    
+                            // Create a unique name for the QR code image
+                            String uniqueName = asset.getAssetCode() + "-room-" + room + "-"
+                                    + System.currentTimeMillis();
+    
+                            // Generate QR code with the unique name
+                            String qrUrl = qrForRooms.generateQRCode(qrData, uniqueName);
+    
+                            // If QR URL is generated successfully, add it to the asset's attributes
                             if (qrUrl != null) {
-                                // Add the QR code URL as an attribute for the room
                                 asset.addQRCodeAttribute("QR Code - Room " + room, qrUrl);
                             }
                         }
@@ -109,10 +124,10 @@ public class AssetServiceImpl implements AssetService {
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
-                break; // Once we process "Floor and rooms", no need to check further attributes
+                break; // Exit the loop after processing the "Floor and Rooms" attribute
             }
         }
-    }
+    }    
 
     private void generateQRCodeForOtherCategories(Asset asset, String categoryName) {
         String baseUrl = "http://localhost:3000/qrdetail/";
@@ -482,4 +497,40 @@ public class AssetServiceImpl implements AssetService {
         assetRepository.save(asset);
     }
 
+    public String updateFloorAndRoomsAttribute(Map<String, Object> payload) {
+        String assetCode = (String) payload.get("assetCode");
+        String name = (String) payload.get("name");
+        String value = (String) payload.get("value");
+    
+        if (assetCode == null || name == null || value == null) {
+            return "Missing assetCode, name, or value.";
+        }
+    
+        Optional<Asset> optionalAsset = assetRepository.findByAssetCode(assetCode);
+    
+        if (optionalAsset.isEmpty()) {
+            return "Asset not found with code: " + assetCode;
+        }
+    
+        Asset asset = optionalAsset.get();
+    
+        List<Attribute> attributes = asset.getAttributes();
+        if (attributes != null && attributes.stream().anyMatch(attr -> "Floor and Rooms".equals(attr.getName()))) {
+            return "Asset already contains Floor and Rooms.";
+        }
+    
+        if (attributes == null) {
+            attributes = new ArrayList<>();
+        }
+    
+        attributes.add(new Attribute(name, value));
+        asset.setAttributes(attributes);
+    
+        // ✅ Generate QR codes for the new Floor and Rooms
+        generateQRCodeForBuilding(asset);
+    
+        assetRepository.save(asset);
+    
+        return "Floor and Rooms attribute added and QR codes generated successfully.";
+    }
 }

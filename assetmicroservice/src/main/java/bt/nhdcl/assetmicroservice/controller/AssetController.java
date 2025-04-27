@@ -66,6 +66,22 @@ public class AssetController {
         return updatedAsset != null ? ResponseEntity.ok(updatedAsset) : ResponseEntity.notFound().build();
     }
 
+    @PostMapping("/update-floor-rooms")
+    public ResponseEntity<Map<String, String>> updateFloorAndRooms(@RequestBody Map<String, Object> payload) {
+        String result = assetService.updateFloorAndRoomsAttribute(payload);
+        Map<String, String> response = Map.of("message", result);
+
+        if (result.contains("successfully")) {
+            return ResponseEntity.ok(response);
+        } else if (result.contains("already")) {
+            return ResponseEntity.ok(response);
+        } else if (result.contains("not found")) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        } else {
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
     @DeleteMapping("/{assetCode}")
     public ResponseEntity<Void> deleteAsset(@PathVariable String assetCode) {
         assetService.deleteAsset(assetCode);

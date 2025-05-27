@@ -25,8 +25,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/assets/find").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/assets/academy/{academyID}").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/assets/upload/excel").hasAuthority("Manager")
-                        .requestMatchers(HttpMethod.POST, "/api/assets/update-floor-rooms").hasRole("Manager")
-                        .requestMatchers(HttpMethod.POST, "/api/assets/{assetID}/upload-images").hasRole("Manager")
+                        .requestMatchers(HttpMethod.POST, "/api/assets/update-floor-rooms").hasAuthority("Manager")
+                        .requestMatchers(HttpMethod.POST, "/api/assets/{assetID}/upload-images").hasAuthority("Manager")
                         .requestMatchers(HttpMethod.POST, "/api/assets").hasAuthority("Manager")
                         .requestMatchers(HttpMethod.PUT, "/api/assets/**").hasAnyAuthority("Admin", "Manager")
                         .requestMatchers(HttpMethod.DELETE, "/api/assets/**").hasAuthority("Admin")
@@ -36,11 +36,12 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/assets/request-dispose")
                         .hasAnyAuthority("Admin", "Manager")
                         .requestMatchers(HttpMethod.GET, "/api/assets", "/api/assets/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/assets/{assetCode}").permitAll()
                         
                         .requestMatchers(HttpMethod.GET, "/api/categories", "/api/categories/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/categories").hasRole("Manager")
-                        .requestMatchers(HttpMethod.PUT, "/api/categories/**").hasRole("Manager")
-                        .requestMatchers(HttpMethod.DELETE, "/api/categories/**").hasRole("Manager")
+                        .requestMatchers(HttpMethod.POST, "/api/categories").hasAuthority("Manager")
+                        .requestMatchers(HttpMethod.PUT, "/api/categories/**").hasAuthority("Manager")
+                        .requestMatchers(HttpMethod.DELETE, "/api/categories/**").hasAuthority("Manager")
 
                         .anyRequest().authenticated())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));

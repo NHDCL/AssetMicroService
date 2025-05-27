@@ -42,7 +42,7 @@ public class QRCodeService {
 
             // Create a Map<String, Object> for upload options
             Map<String, Object> uploadOptions = new HashMap<>();
-            uploadOptions.put("public_id", "qr_code");  // Optional: Set public_id for Cloudinary
+            uploadOptions.put("public_id", "qr_code_" + text.hashCode());
 
             // Upload the file to Cloudinary with the correct type
             Map<String, Object> uploadResult = cloudinary.uploader().upload(tempFile, uploadOptions);
